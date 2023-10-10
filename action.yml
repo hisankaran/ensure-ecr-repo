@@ -19,6 +19,10 @@ inputs:
     description: 'The number of images with the given prefix to retain'
     required: false
     # Defaults to retaining all tagged images
+  ALLOW_READ_ACCESS_AWS_ACCOUNTS:
+    description: 'AWS accounts to allow read images'
+    required: false
+    default: ''
 runs:
   using: 'node16'
   main: 'dist/index.js'

@@ -7,6 +7,7 @@ async function run () {
     const daysBeforeExpiringUntaggedImages = getInput('NUM_DAYS_BEFORE_EXPIRING_UNTAGGED_IMAGES', { required: true })
     const tagPrefix = getInput('TAG_PREFIX')
     const numImages = getInput('NUM_TAGGED_IMAGES_TO_RETAIN')
+    const awsAccounts = getInput('ALLOW_READ_ACCESS_AWS_ACCOUNTS').split(",").filter(Boolean)
     if (tagPrefix && !numImages) {
       setFailed('If TAG_PREFIX is provided, NUM_TAGGED_IMAGES_TO_RETAIN is required')
       return
@@ -32,14 +33,14 @@ async function run () {
     console.log('Repository does not exist. Creating...')
     await ecr.createRepository({ repositoryName, imageScanningConfiguration: { scanOnPush: true } }).promise()
 
-    const accessPolicyText = JSON.stringify({
+    const accessPolicy = {
       Version: '2008-10-17',
       Statement: [
         {
           Sid: 'pull',
           Effect: 'Allow',
           Principal: {
-            Service: 'codebuild.amazonaws.com'
+            Service: 'codebuild.amazonaws.com',
           },
           Action: [
             'ecr:GetDownloadUrlForLayer',
@@ -48,7 +49,11 @@ async function run () {
           ]
         }
       ]
-    })
+    }
+
+    if (awsAccounts.length) {
+      accessPolicy.Statement[0].Principal.AWS = awsAccounts;
+    }
 
     const lifecyclePolicy = {
       rules: [
@@ -86,7 +91,7 @@ async function run () {
 
     console.log('Applying repository access and lifecycle policies...')
     await Promise.all([
-      ecr.setRepositoryPolicy({ repositoryName, policyText: accessPolicyText }).promise(),
+      ecr.setRepositoryPolicy({ repositoryName, policyText: JSON.stringify(accessPolicy) }).promise(),
       ecr.putLifecyclePolicy({ repositoryName, lifecyclePolicyText }).promise()
     ])
 
